@@ -2,6 +2,7 @@ from collections import Counter, OrderedDict
 import six
 import torch
 from torch.autograd import Variable
+import unicodedata
 
 from .dataset import Dataset
 from .pipeline import Pipeline
@@ -197,3 +198,36 @@ class Field(object):
         if self.include_lengths:
             return Variable(arr, volatile=not train), lengths
         return Variable(arr, volatile=not train)
+
+
+class SubwordField(Field):
+
+    def build_vocab(self, *args, **kwargs):
+        """Construct the Vocab object for this field from one or more datasets.
+
+        Arguments:
+            Positional arguments: Dataset objects or other iterable data
+                sources from which to construct the Vocab object that
+                represents the set of possible values for this field. If
+                a Dataset object is provided, all columns corresponding
+                to this field are used; individual columns can also be
+                provided directly.
+            Remaining keyword arguments: Passed to the constructor of Vocab.
+        """
+        counter = Counter()
+        sources = []
+        for arg in args:
+            if isinstance(arg, Dataset):
+                sources += [getattr(arg, name) for name, field in
+                            arg.fields.items() if field is self]
+            else:
+                sources.append(arg)
+        for data in sources:
+            for x in data:
+                if not self.sequential:
+                    x = [x]
+                counter.update(x)
+        specials = list(OrderedDict.fromkeys(
+            tok for tok in [self.pad_token, self.init_token, self.eos_token]
+            if tok is not None))
+        self.vocab = Vocab(counter, specials=specials, **kwargs)
