@@ -156,6 +156,9 @@ class Field(object):
             if tok is not None))
         self.vocab = Vocab(counter, specials=specials, **kwargs)
 
+    def vocabify(self, ex):
+        return [self.vocab.stoi[x] for x in ex]
+
     def numericalize(self, arr, device=None, train=True):
         """Turn a batch of examples that use this field into a Variable.
 
@@ -175,9 +178,9 @@ class Field(object):
             arr, lengths = arr
         if self.use_vocab:
             if self.sequential:
-                arr = [[self.vocab.stoi[x] for x in ex] for ex in arr]
+                arr = [self.vocabify(ex) for ex in arr]
             else:
-                arr = [self.vocab.stoi[x] for x in arr]
+                arr = self.vocabify(arr)
 
             if self.postprocessing is not None:
                 arr = self.postprocessing(arr, self.vocab, train)
@@ -200,7 +203,44 @@ class Field(object):
         return Variable(arr, volatile=not train)
 
 
-class SubwordField(Field):
+class ReversibleField(Field):
+
+    def __init__(
+            self, sequential=True, use_vocab=True, init_token=None,
+            eos_token=None, fix_length=None, tensor_type=torch.LongTensor,
+            preprocessing=None, postprocessing=None, lower=False,
+            include_lengths=False, batch_first=False, pad_token='<pad>'):
+        self.sequential = sequential
+        self.use_vocab = use_vocab
+        self.init_token = init_token
+        self.eos_token = eos_token
+        self.fix_length = fix_length
+        self.tensor_type = tensor_type
+        self.preprocessing = preprocessing
+        self.postprocessing = postprocessing
+        self.lower = lower
+        self.tokenize = get_tokenizer('revtok')
+        self.include_lengths = include_lengths
+        self.batch_first = batch_first
+        self.pad_token = pad_token if self.sequential else None
+
+    def detokenize(self, ex):
+        import revtok
+        return revtok.detokenize(ex)
+
+    def reverse(self, batch):
+        if not self.batch_first:
+            batch.t_()
+        batch = batch.tolist()
+        batch = [[self.vocab.itos[ind] for ind in ex] for ex in batch]
+        batch = [filter(ex, lambda tok: tok not in (
+            self.init_token, self.eos_token, self.pad_token)) for ex in batch]
+        return [self.detokenize(ex) for ex in batch]
+
+class SubwordField(ReversibleField):
+
+    def vocabify(self, ex):
+        return [self.vocab.stoi[tok] for tok in self.vocab.segment(ex)]
 
     def build_vocab(self, *args, **kwargs):
         """Construct the Vocab object for this field from one or more datasets.
