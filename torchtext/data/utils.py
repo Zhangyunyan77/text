@@ -1,3 +1,5 @@
+import unicodedata
+
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
         return tokenizer
@@ -28,40 +30,18 @@ def get_tokenizer(tokenizer):
                   "See the docs at http://nltk.org for more information.")
             raise
     elif tokenizer == 'revtok':
-        return revtok
+        try:
+            import revtok
+            return revtok.tokenize
+        except ImportError:
+            print("Please install revtok.")
+            raise
     raise ValueError("Requested tokenizer {}, valid choices are a "
                      "callable that takes a single string as input, "
-                     "\"revtok\" for the torchtext reversible tokenizer, "
+                     "\"revtok\" for the revtok reversible tokenizer, "
                      "\"spacy\" for the SpaCy English tokenizer, or "
                      "\"moses\" for the NLTK port of the Moses tokenization "
                      "script.".format(tokenizer))
-
-
-def revtok(s):
-    """Simple reversible tokenizer"""
-
-    HALF = '\ue300' # private use character
-    toks = [HALF]
-    current_cat = None
-    for c in s:
-        cat = unicodedata.category(c)[0]
-        if c == ' ':
-            toks[-1] += HALF
-            toks.append(HALF)
-            current_cat = None
-        elif current_cat is None or cat == current_cat:
-            toks[-1] += c
-            current_cat = cat
-        else:
-            current_cat = cat
-            if toks[-1].startswith(HALF):
-                toks[-1] += HALF
-                toks.append(c)
-            else:
-                toks.append(HALF + c)
-    if not toks[-1].endswith(HALF):
-        toks[-1] += HALF
-    return toks
 
 
 def interleave_keys(a, b):
