@@ -135,6 +135,56 @@ class Vocab(object):
                 self.vectors[i] = unk_init(self.vectors[i])
 
 
+def SubwordVocab(Vocab):
+
+    def segment(self, ex):
+        return [self.segmenter(word) for word in ex]
+
+    def __init__(self, counter, max_size=None, specials=['<pad>'],
+                 vectors=None, unk_init=torch.Tensor.zero_, expand_vocab=False):
+        """Create a Vocab object from a collections.Counter.
+
+        Arguments:
+            counter: collections.Counter object holding the frequencies of
+                each value found in the data.
+            max_size: The maximum size of the vocabulary, or None for no
+                maximum. Default: None.
+            min_freq: The minimum frequency needed to include a token in the
+                vocabulary. Default: 1.
+            specials: The list of special tokens (e.g., padding or eos) that
+                will be prepended to the vocabulary in addition to an <unk>
+                token.
+            vectors: one of the available pretrained vectors or a list with each
+                element one of the available pretrained vectors (see Vocab.load_vectors)
+            unk_init (callback): by default, initalize out-of-vocabulary word vectors
+                to zero vectors; can be any function that takes in a Tensor and
+                returns a Tensor of the same size
+            expand_vocab (bool): expand vocabulary to include all words for which
+                the specified pretrained word vectors are available
+        """
+        import revtok
+        self.segmenter = revtok.SubwordSegmenter(counter, max_size)
+ 
+        self.stoi = defaultdict(lambda: 0)
+        self.stoi.update({tok: i + 1 for i, tok in enumerate(specials)})
+        self.itos = ['<unk>'] + specials
+
+        counter.subtract({tok: counter[tok] for tok in ['<unk>'] + specials})
+        max_size = None if max_size is None else max_size + len(self.itos)
+
+        # sort by frequency, then alphabetically
+        words = sorted(counter.items(), key=lambda tup: tup[0])
+        words.sort(key=lambda tup: tup[1], reverse=True)
+
+        for k, v in words:
+            if v < min_freq or len(self.itos) == max_size:
+                break
+            self.itos.append(k)
+            self.stoi[k] = len(self.itos) - 1
+
+        if vectors is not None:
+            self.load_vectors(vectors, unk_init=unk_init, expand_vocab=expand_vocab)
+
 class Vectors(object):
 
     def __init__(self, name, cache='.vector_cache',
