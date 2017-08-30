@@ -1,5 +1,3 @@
-import unicodedata
-
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
         return tokenizer

@@ -2,7 +2,6 @@ from collections import Counter, OrderedDict
 import six
 import torch
 from torch.autograd import Variable
-import unicodedata
 
 from .dataset import Dataset
 from .pipeline import Pipeline
@@ -227,6 +226,7 @@ class ReversibleField(Field):
         batch = [filter(ex, lambda tok: tok not in (
             self.init_token, self.eos_token, self.pad_token)) for ex in batch]
         return [self.detokenize(ex) for ex in batch]
+
 
 class SubwordField(ReversibleField):
 
