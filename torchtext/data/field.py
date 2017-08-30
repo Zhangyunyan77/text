@@ -7,7 +7,7 @@ import unicodedata
 from .dataset import Dataset
 from .pipeline import Pipeline
 from .utils import get_tokenizer
-from ..vocab import Vocab
+from ..vocab import Vocab, SubwordVocab
 
 
 class Field(object):
@@ -57,6 +57,8 @@ class Field(object):
             Default: False.
         pad_token: The string token used as padding. Default: "<pad>".
     """
+
+    vocab_cls = Vocab
 
     def __init__(
             self, sequential=True, use_vocab=True, init_token=None,
@@ -154,7 +156,7 @@ class Field(object):
         specials = list(OrderedDict.fromkeys(
             tok for tok in [self.pad_token, self.init_token, self.eos_token]
             if tok is not None))
-        self.vocab = Vocab(counter, specials=specials, **kwargs)
+        self.vocab = self.vocab_cls(counter, specials=specials, **kwargs)
 
     def vocabify(self, ex):
         return [self.vocab.stoi[x] for x in ex]
@@ -205,28 +207,17 @@ class Field(object):
 
 class ReversibleField(Field):
 
-    def __init__(
-            self, sequential=True, use_vocab=True, init_token=None,
-            eos_token=None, fix_length=None, tensor_type=torch.LongTensor,
-            preprocessing=None, postprocessing=None, lower=False,
-            include_lengths=False, batch_first=False, pad_token='<pad>'):
-        self.sequential = sequential
-        self.use_vocab = use_vocab
-        self.init_token = init_token
-        self.eos_token = eos_token
-        self.fix_length = fix_length
-        self.tensor_type = tensor_type
-        self.preprocessing = preprocessing
-        self.postprocessing = postprocessing
-        self.lower = lower
-        self.tokenize = get_tokenizer('revtok')
-        self.include_lengths = include_lengths
-        self.batch_first = batch_first
-        self.pad_token = pad_token if self.sequential else None
-
-    def detokenize(self, ex):
+    try:
         import revtok
-        return revtok.detokenize(ex)
+    except ImportError:
+        print("Please install revtok.")
+        raise
+    detokenize = revtok.detokenize
+
+    def __init__(self, **kwargs):
+        if kwargs.get('tokenize') not in ('revtok', 'subword'):
+            kwargs['tokenize'] = 'revtok'
+        super(ReversibleField, self).__init__(**kwargs)
 
     def reverse(self, batch):
         if not self.batch_first:
@@ -239,35 +230,11 @@ class ReversibleField(Field):
 
 class SubwordField(ReversibleField):
 
+    vocab_cls = SubwordVocab
+
+    def __init__(self, **kwargs):
+        kwargs['tokenize'] = 'subword'
+        super(ReversibleField, self).__init__(**kwargs)
+
     def vocabify(self, ex):
         return [self.vocab.stoi[tok] for tok in self.vocab.segment(ex)]
-
-    def build_vocab(self, *args, **kwargs):
-        """Construct the Vocab object for this field from one or more datasets.
-
-        Arguments:
-            Positional arguments: Dataset objects or other iterable data
-                sources from which to construct the Vocab object that
-                represents the set of possible values for this field. If
-                a Dataset object is provided, all columns corresponding
-                to this field are used; individual columns can also be
-                provided directly.
-            Remaining keyword arguments: Passed to the constructor of Vocab.
-        """
-        counter = Counter()
-        sources = []
-        for arg in args:
-            if isinstance(arg, Dataset):
-                sources += [getattr(arg, name) for name, field in
-                            arg.fields.items() if field is self]
-            else:
-                sources.append(arg)
-        for data in sources:
-            for x in data:
-                if not self.sequential:
-                    x = [x]
-                counter.update(x)
-        specials = list(OrderedDict.fromkeys(
-            tok for tok in [self.pad_token, self.init_token, self.eos_token]
-            if tok is not None))
-        self.vocab = Vocab(counter, specials=specials, **kwargs)

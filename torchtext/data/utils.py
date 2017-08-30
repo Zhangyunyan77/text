@@ -36,9 +36,17 @@ def get_tokenizer(tokenizer):
         except ImportError:
             print("Please install revtok.")
             raise
+    elif tokenizer == 'subword':
+        try:
+            import revtok
+            return lambda x: revtok.tokenize(x, decap=True)
+        except ImportError:
+            print("Please install revtok.")
+            raise
     raise ValueError("Requested tokenizer {}, valid choices are a "
                      "callable that takes a single string as input, "
                      "\"revtok\" for the revtok reversible tokenizer, "
+                     "\"subword\" for the revtok caps-aware tokenizer, "
                      "\"spacy\" for the SpaCy English tokenizer, or "
                      "\"moses\" for the NLTK port of the Moses tokenization "
                      "script.".format(tokenizer))

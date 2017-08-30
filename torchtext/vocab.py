@@ -106,7 +106,7 @@ class Vocab(object):
             start_dim = 0
             for v in vectors:
                 end_dim = start_dim + v.dim
-                self.vectors[i][start_dim:end_dim] = v[token]
+                self.vectors[i][start_dim:end_dim] = v[token.strip()]
                 start_dim = end_dim
             assert(start_dim == tot_dim)
 
@@ -142,43 +142,36 @@ def SubwordVocab(Vocab):
 
     def __init__(self, counter, max_size=None, specials=['<pad>'],
                  vectors=None, unk_init=torch.Tensor.zero_, expand_vocab=False):
-        """Create a Vocab object from a collections.Counter.
+        """Create a revtok subword vocabulary from a collections.Counter.
 
         Arguments:
             counter: collections.Counter object holding the frequencies of
-                each value found in the data.
-            max_size: The maximum size of the vocabulary, or None for no
+                each word found in the data.
+            max_size: The maximum size of the subword vocabulary, or None for no
                 maximum. Default: None.
-            min_freq: The minimum frequency needed to include a token in the
-                vocabulary. Default: 1.
             specials: The list of special tokens (e.g., padding or eos) that
                 will be prepended to the vocabulary in addition to an <unk>
                 token.
-            vectors: one of the available pretrained vectors or a list with each
-                element one of the available pretrained vectors (see Vocab.load_vectors)
-            unk_init (callback): by default, initalize out-of-vocabulary word vectors
-                to zero vectors; can be any function that takes in a Tensor and
-                returns a Tensor of the same size
-            expand_vocab (bool): expand vocabulary to include all words for which
-                the specified pretrained word vectors are available
         """
-        import revtok
-        self.segmenter = revtok.SubwordSegmenter(counter, max_size)
- 
+        try:
+            import revtok
+        except ImportError:
+            print("Please install revtok.")
+            raise
+
         self.stoi = defaultdict(lambda: 0)
         self.stoi.update({tok: i + 1 for i, tok in enumerate(specials)})
         self.itos = ['<unk>'] + specials
 
-        counter.subtract({tok: counter[tok] for tok in ['<unk>'] + specials})
+        self.segmenter = revtok.SubwordSegmenter(counter, max_size)
+
         max_size = None if max_size is None else max_size + len(self.itos)
 
         # sort by frequency, then alphabetically
-        words = sorted(counter.items(), key=lambda tup: tup[0])
-        words.sort(key=lambda tup: tup[1], reverse=True)
+        toks = sorted(self.segmenter.vocab.items(), key=lambda tup: tup[0])
+        toks.sort(key=lambda tup: tup[1], reverse=True)
 
-        for k, v in words:
-            if v < min_freq or len(self.itos) == max_size:
-                break
+        for k, v in toks:
             self.itos.append(k)
             self.stoi[k] = len(self.itos) - 1
 
@@ -343,7 +336,10 @@ class CharNGram(Vectors):
         else:
             vector = self.unk_init(vector)
         return vector
+<<<<<<< f0cc047f3b727b28ddd98534fa55c600fd5fd5d3
 
 
 def _default_unk_index():
     return 0
+=======
+>>>>>>> revtok integration
