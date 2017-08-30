@@ -208,10 +208,9 @@ class ReversibleField(Field):
 
     try:
         import revtok
+        detokenize = revtok.detokenize
     except ImportError:
-        print("Please install revtok.")
-        raise
-    detokenize = revtok.detokenize
+        detokenize = lambda x: raise RuntimeError("Please install revtok.")
 
     def __init__(self, **kwargs):
         if kwargs.get('tokenize') not in ('revtok', 'subword'):
