@@ -2,6 +2,7 @@ from collections import Counter, OrderedDict
 import six
 import torch
 from torch.autograd import Variable
+from tqdm import tqdm
 
 from .dataset import Dataset
 from .pipeline import Pipeline
@@ -157,9 +158,6 @@ class Field(object):
             if tok is not None))
         self.vocab = self.vocab_cls(counter, specials=specials, **kwargs)
 
-    def vocabify(self, ex):
-        return [self.vocab.stoi[x] for x in ex]
-
     def numericalize(self, arr, device=None, train=True):
         """Turn a batch of examples that use this field into a Variable.
 
@@ -179,9 +177,9 @@ class Field(object):
             arr, lengths = arr
         if self.use_vocab:
             if self.sequential:
-                arr = [self.vocabify(ex) for ex in arr]
+                arr = [[self.vocab.stoi[x] for x in ex] for ex in arr]
             else:
-                arr = self.vocabify(arr)
+                arr = [self.vocab.stoi[x] for x in arr]
 
             if self.postprocessing is not None:
                 arr = self.postprocessing(arr, self.vocab, train)
@@ -206,27 +204,24 @@ class Field(object):
 
 class ReversibleField(Field):
 
-    try:
-        import revtok
-        detokenize = revtok.detokenize
-    except ImportError:
-        @staticmethod
-        def detokenize(ex):
-            raise RuntimeError("Please install revtok.")
-
     def __init__(self, **kwargs):
         if kwargs.get('tokenize') not in ('revtok', 'subword'):
             kwargs['tokenize'] = 'revtok'
         super(ReversibleField, self).__init__(**kwargs)
 
     def reverse(self, batch):
+        try:
+            import revtok
+        except ImportError:
+            print("Please install revtok.")
+            raise
         if not self.batch_first:
             batch.t_()
         batch = batch.tolist()
         batch = [[self.vocab.itos[ind] for ind in ex] for ex in batch]
-        batch = [filter(ex, lambda tok: tok not in (
-            self.init_token, self.eos_token, self.pad_token)) for ex in batch]
-        return [self.detokenize(ex) for ex in batch]
+        batch = [filter(lambda tok: tok not in (
+            self.init_token, self.eos_token, self.pad_token), ex) for ex in batch]
+        return [revtok.detokenize(ex) for ex in batch]
 
 
 class SubwordField(ReversibleField):
@@ -237,5 +232,22 @@ class SubwordField(ReversibleField):
         kwargs['tokenize'] = 'subword'
         super(ReversibleField, self).__init__(**kwargs)
 
-    def vocabify(self, ex):
-        return [self.vocab.stoi[tok] for tok in self.vocab.segment(ex)]
+    def segment(self,  *args):
+        """Segment one or more datasets with this subword field.
+
+        Arguments:
+            Positional arguments: Dataset objects or other indexable
+                mutable sequences to segment. If a Dataset object is provided,
+                all columns corresponding to this field are used; individual
+                columns can also be provided directly.
+        """
+        sources = []
+        for arg in args:
+            if isinstance(arg, Dataset):
+                sources += [getattr(arg, name) for name, field in
+                            arg.fields.items() if field is self]
+            else:
+                sources.append(arg)
+        for data in sources:
+            for x in tqdm(data, 'segmenting'):
+                x[:] = self.vocab.segment(x)

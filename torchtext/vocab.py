@@ -135,10 +135,10 @@ class Vocab(object):
                 self.vectors[i] = unk_init(self.vectors[i])
 
 
-def SubwordVocab(Vocab):
+class SubwordVocab(Vocab):
 
     def segment(self, ex):
-        return [self.segmenter(word) for word in ex]
+        return [tok for word in ex for tok in self.segmenter(word)]
 
     def __init__(self, counter, max_size=None, specials=['<pad>'],
                  vectors=None, unk_init=torch.Tensor.zero_, expand_vocab=False):
@@ -167,13 +167,13 @@ def SubwordVocab(Vocab):
 
         max_size = None if max_size is None else max_size + len(self.itos)
 
-        # sort by frequency, then alphabetically
-        toks = sorted(self.segmenter.vocab.items(), key=lambda tup: tup[0])
-        toks.sort(key=lambda tup: tup[1], reverse=True)
+        # sort by frequency/entropy, then alphabetically
+        toks = sorted(self.segmenter.vocab.items(),
+                      key=lambda tup: (len(tup[0])!=1, -tup[1], tup[0]))
 
-        for k, v in toks:
-            self.itos.append(k)
-            self.stoi[k] = len(self.itos) - 1
+        for tok, _ in toks:
+            self.itos.append(tok)
+            self.stoi[tok] = len(self.itos) - 1
 
         if vectors is not None:
             self.load_vectors(vectors, unk_init=unk_init, expand_vocab=expand_vocab)
