@@ -337,10 +337,7 @@ class CharNGram(Vectors):
         else:
             vector = self.unk_init(vector)
         return vector
-<<<<<<< f0cc047f3b727b28ddd98534fa55c600fd5fd5d3
 
 
 def _default_unk_index():
     return 0
-=======
->>>>>>> revtok integration
