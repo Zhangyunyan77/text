@@ -31,7 +31,6 @@ class Example(object):
 
     @classmethod
     def fromTSV(cls, data, fields):
-        data = data.rstrip("\n")
         return cls.fromlist(data.split('\t'), fields)
 
     @classmethod
