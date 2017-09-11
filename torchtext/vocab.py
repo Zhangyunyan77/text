@@ -169,7 +169,7 @@ class SubwordVocab(Vocab):
 
         # sort by frequency/entropy, then alphabetically
         toks = sorted(self.segmenter.vocab.items(),
-                      key=lambda tup: (len(tup[0])!=1, -tup[1], tup[0]))
+                      key=lambda tup: (len(tup[0]) != 1, -tup[1], tup[0]))
 
         for tok, _ in toks:
             self.itos.append(tok)

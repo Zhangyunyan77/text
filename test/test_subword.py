@@ -1,7 +1,7 @@
 import unittest
 
 from torchtext import data
-from torchtext.datasets import TREC, SNLI
+from torchtext.datasets import TREC
 
 
 class TestSubword(unittest.TestCase):
@@ -9,8 +9,8 @@ class TestSubword(unittest.TestCase):
         TEXT = data.SubwordField()
         LABEL = data.Field(sequential=False)
         RAW = data.Field(sequential=False, use_vocab=False)
-        raw, = TREC.splits(RAW, LABEL, train=TREC.test_filename, test=None)
-        cooked, = TREC.splits(TEXT, LABEL, train=TREC.test_filename, test=None)
+        raw, = TREC.splits(RAW, LABEL, train=None)
+        cooked, = TREC.splits(TEXT, LABEL, train=None)
         LABEL.build_vocab(cooked)
         TEXT.build_vocab(cooked, max_size=100)
         TEXT.segment(cooked)
